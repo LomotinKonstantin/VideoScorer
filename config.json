@@ -1,0 +1,6 @@
+{
+  "iqa_model": "iqa/detector_DIQA_64x9_more_epochs_27.04.2020_02-48-58/dist_diqa_ssm_live.h5",
+  "iqa_detector": "iqa/detect.tflite",
+  "patch_weights": "iqa/detector_DIQA_64x9_more_epochs_27.04.2020_02-48-58/weights.pkl",
+  "stc_model": "stc/shot_type_classifier.pkl"
+}

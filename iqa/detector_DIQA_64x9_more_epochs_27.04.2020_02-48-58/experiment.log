@@ -1,0 +1,57 @@
+[2020-04-27 02:48:58,488]	Allocating 4096 Mb on GPU device
+[2020-04-27 02:48:58,728]	[PhysicalDevice(name='/physical_device:GPU:0', device_type='GPU')]
+[2020-04-27 02:48:58,729]	Using patches implies batch_size = 0
+[2020-04-27 02:48:58,729]	**********live**********
+[2020-04-27 02:48:58,729]	Creating dataset
+[2020-04-27 02:49:00,274]	Dataset LIVE_409x614 (789 train / 193 test)
+[2020-04-27 02:49:00,274]	Preparing dataset for OEM training
+[2020-04-27 02:49:00,972]	Creating OEM
+[2020-04-27 02:49:01,039]	Training OEM
+[2020-04-27 02:54:04,002]	Preparing dataset for SSM training
+[2020-04-27 02:54:04,082]	Creating SSM
+[2020-04-27 02:54:04,116]	Training SSM
+[2020-04-27 03:03:20,960]	Saving config
+[2020-04-27 03:03:20,960]	Saving SSM
+[2020-04-27 03:03:20,998]	Saving OEM
+[2020-04-27 03:03:21,013]	Converting models to TF Lite
+[2020-04-27 03:03:28,502]	Saving TF Lite models
+[2020-04-27 03:03:28,504]	Testing SSM
+[2020-04-27 03:03:31,942]	Writing report
+[2020-04-27 03:03:31,942]	Done. Total time elapsed: 0:14:33
+
+[2020-04-27 03:03:31,942]	**********tid2013**********
+[2020-04-27 03:03:31,942]	Creating dataset
+[2020-04-27 03:03:32,459]	Dataset TID2008_409x307 (2400 train / 600 test)
+[2020-04-27 03:03:32,459]	Preparing dataset for OEM training
+[2020-04-27 03:03:32,572]	Creating OEM
+[2020-04-27 03:03:32,634]	Training OEM
+[2020-04-27 03:18:15,039]	Preparing dataset for SSM training
+[2020-04-27 03:18:15,084]	Creating SSM
+[2020-04-27 03:18:15,118]	Training SSM
+[2020-04-27 03:43:40,163]	Saving config
+[2020-04-27 03:43:40,163]	Saving SSM
+[2020-04-27 03:43:40,201]	Saving OEM
+[2020-04-27 03:43:40,215]	Converting models to TF Lite
+[2020-04-27 03:43:47,109]	Saving TF Lite models
+[2020-04-27 03:43:47,110]	Testing SSM
+[2020-04-27 03:43:52,264]	Writing report
+[2020-04-27 03:43:52,264]	Done. Total time elapsed: 0:54:53
+
+[2020-04-27 03:43:52,265]	**********tid2008**********
+[2020-04-27 03:43:52,265]	Creating dataset
+[2020-04-27 03:43:52,503]	Dataset TID2008_307x409 (1360 train / 340 test)
+[2020-04-27 03:43:52,503]	Preparing dataset for OEM training
+[2020-04-27 03:43:52,608]	Creating OEM
+[2020-04-27 03:43:52,669]	Training OEM
+[2020-04-27 03:52:13,069]	Preparing dataset for SSM training
+[2020-04-27 03:52:13,116]	Creating SSM
+[2020-04-27 03:52:13,152]	Training SSM
+[2020-04-27 04:06:45,005]	Saving config
+[2020-04-27 04:06:45,006]	Saving SSM
+[2020-04-27 04:06:45,040]	Saving OEM
+[2020-04-27 04:06:45,054]	Converting models to TF Lite
+[2020-04-27 04:06:52,075]	Saving TF Lite models
+[2020-04-27 04:06:52,076]	Testing SSM
+[2020-04-27 04:06:55,276]	Writing report
+[2020-04-27 04:06:55,276]	Done. Total time elapsed: 1:17:56
+

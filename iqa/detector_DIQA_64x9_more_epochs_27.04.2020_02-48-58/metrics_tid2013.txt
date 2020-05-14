@@ -1,0 +1,10 @@
+DetectorDIQA
+Dataset: TID2008_409x307
+Test samples: 600
+Patch size: 64x64
+Patches per side: 3
+spearman: 0.442 (p = 0.0)
+pearson: 0.557 (p = 0.0)
+kendall: 0.31 (p = 0.0)
+mse: 1.339
+Тестовый запуск

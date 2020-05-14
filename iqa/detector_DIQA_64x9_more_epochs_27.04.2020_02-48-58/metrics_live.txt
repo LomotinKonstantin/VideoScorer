@@ -1,0 +1,10 @@
+DetectorDIQA
+Dataset: LIVE_409x614
+Test samples: 193
+Patch size: 64x64
+Patches per side: 3
+spearman: 0.977 (p = 0.0)
+pearson: 0.979 (p = 0.0)
+kendall: 0.873 (p = 0.0)
+mse: 19.636
+Тестовый запуск
