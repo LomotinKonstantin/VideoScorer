@@ -15,6 +15,8 @@ class TFLiteModel:
         self._ntop = 3
 
     def predict(self, img):
+        if type(img) != tf.Tensor:
+            img = tf.convert_to_tensor(img)
         input_data = tf.image.resize(img, (self.input_shape[2], self.input_shape[1]))
         input_data = tf.cast(image_normalization(input_data), tf.dtypes.uint8)
         input_data = tf.reshape(input_data, self.input_shape)

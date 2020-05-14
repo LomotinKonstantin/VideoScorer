@@ -46,12 +46,12 @@ def main():
     with open(patch_w_path, "rb") as wf:
         patch_weights = pickle.load(wf)
     # SBD
-    logging.info("Loading SBD model")
+    # logging.info("Loading SBD model")
     sbd_threshold = args.sbd_threshold
-    params = TransNetParams()
-    transnet_cp_path = cur_folder / "TransNet/model/transnet_model-F16_L3_S2_D256"
-    params.CHECKPOINT_PATH = str(transnet_cp_path.absolute())
-    net = TransNet(params)
+    # params = TransNetParams()
+    # transnet_cp_path = cur_folder / "TransNet/model/transnet_model-F16_L3_S2_D256"
+    # params.CHECKPOINT_PATH = str(transnet_cp_path.absolute())
+    net = None# net = TransNet(params)
     # STC
     logging.info("Loading STC model")
     stc_model = load_learner(cur_folder / "stc", "shot-type-classifier.pkl")

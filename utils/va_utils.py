@@ -1,8 +1,10 @@
 from collections import Counter
+from importlib import reload
+from datetime import timedelta
 import logging
 from pathlib import Path
 from time import time
-from datetime import timedelta
+
 
 import cv2
 from fastai.vision import Learner, Image, np2model_tensor
@@ -16,6 +18,8 @@ from utils.video_utils import video_reader
 from utils.TFLiteModel import TFLiteModel
 from TransNet.transnet import TransNet, TransNetParams
 from TransNet.transnet_utils import scenes_from_predictions
+
+from multiprocessing import Process, Queue
 
 TID_MAX_MOS = 9.
 LIVE_MAX_MOS = 100.
@@ -52,6 +56,15 @@ def read_to_array(video_path: Path, width: int or None, height: int or None):
     return video
 
 
+def get_shot_boundaries_proc(queue: Queue, vid_path, threshold):
+    transnet = load_transnet()
+    video_arr_255_uint8 = read_to_array(video_path=vid_path,
+                                        width=transnet.params.INPUT_WIDTH,
+                                        height=transnet.params.INPUT_HEIGHT)
+    sb = get_shot_boundaries(transnet, video_arr_255_uint8, threshold)
+    queue.put(sb)
+
+
 def get_shot_boundaries(net: TransNet, video: np.ndarray, threshold: float):
     # resized_video = reshape_video(video, net.params.INPUT_WIDTH, net.params.INPUT_HEIGHT)
     predicts = net.predict_video(video)
@@ -73,7 +86,8 @@ def _create_predictor(detector_model: TFLiteModel,
                       patch_size: int, patches_per_side: int,
                       min_square=0.3):
     def predict(frame: np.ndarray):
-        bb = detector_model.get_bounding_box(frame, min_square)
+        logging.info(f"{frame.shape}, {type(frame)}, eager: {tf.executing_eagerly()}")
+        bb = detector_model.get_bounding_box(frame.astype(np.uint8), min_square)
         if bb is not None:
             frame = crop_img(frame, bb)
         patches = extract_patches(frame, patch_size, patches_per_side)
@@ -97,16 +111,17 @@ def iqa_assess_frames(iqa_model, iqa_detector: TFLiteModel,
     """
     assert len(frames), "'frames' must contain at least one image (3d-array)"
     n_patches = len(patch_weights)
-    patch_size = iqa_model.input_shape[1:-1]
-    assert patch_size[0] == patch_size[1]
+    patch_size = iqa_model.input_shape[1]
+    # assert patch_size[0] == patch_size[1]
     preprocess_func = np.vectorize(_create_predictor(detector_model=iqa_detector,
                                                      iqa_model=iqa_model,
                                                      patch_weights=patch_weights,
                                                      patch_size=patch_size,
                                                      patches_per_side=n_patches),
-                                   signature="(n,m)->()")
+                                   signature="(n,m,k)->()")
     # На этом моменте молимся
     t = time()
+    assert len(frames.shape) == 4, frames.shape
     iqa_scores = preprocess_func(frames)
     assert len(iqa_scores) == len(frames), f"{iqa_scores} iqa scores"
     return iqa_scores, time() - t
@@ -290,18 +305,28 @@ def assess_video(vid_path: Path,
     # Через ffmpeg удобно грузить видео.
     # Грузим в 24-битном формате и исходном размере
     logger.info("Loading video")
-    video_arr_255_uint8 = read_to_array(video_path=vid_path,
-                                        width=transnet.params.INPUT_WIDTH,
-                                        height=transnet.params.INPUT_HEIGHT)
+    # video_arr_255_uint8 = read_to_array(video_path=vid_path,
+    #                                     width=transnet.params.INPUT_WIDTH,
+    #                                     height=transnet.params.INPUT_HEIGHT)
     t = time()
     logger.info("Getting shot boundaries")
-    shots = get_shot_boundaries(net=transnet, video=video_arr_255_uint8, threshold=shot_split_threshold)
-    import pickle
-    with open("tmp", "wb") as f:
-        pickle.dump(shots, f)
+    # import pickle
+    # with open("tmp", "rb") as f:
+    #     shots = pickle.load(f)
+    # shots = get_shot_boundaries(net=transnet, video=video_arr_255_uint8, threshold=shot_split_threshold)
+    # logger.info(f"Detected {len(shots)} shots")
     # Все видео в память не поместится,
     # а это слишком маленькое, чтобы использовать дальше
-    del video_arr_255_uint8
+    # del video_arr_255_uint8
+    # del transnet
+    queue = Queue()
+    p = Process(target=get_shot_boundaries_proc, args=(queue, vid_path, shot_split_threshold))
+    p.start()
+    p.join()  # this blocks until the process terminates
+    shots = queue.get()
+    # reload(tf)
+    # tf.keras.backend.clear_session()
+    print(tf.executing_eagerly())
     total_sbd_time = time() - t
     pix_coef = 1 / 255
     shot_start_end_types = []
@@ -309,7 +334,7 @@ def assess_video(vid_path: Path,
     total_iqa_time = 0
     total_stc_time = 0
     total_detector_time = 0
-    reader = video_reader(vid_path, STC_SHAPE)
+    reader = video_reader(vid_path, shape=STC_SHAPE[::-1])
     for idx, (start, end) in enumerate(shots):
         logger.info(f"Processing shot {idx + 1} / {len(shots)}")
         # Собираем шот
@@ -374,6 +399,6 @@ def assess_video(vid_path: Path,
         "stc_time": total_stc_time,
         "detector_time": total_detector_time,
         "total_time": total_time,
-        "mean_fps": len(video_arr_255_uint8) / total_time,
+        # "mean_fps": len(video_arr_255_uint8) / total_time,
     }
     return result

@@ -32,7 +32,8 @@ def video_reader(path, batch_size=1, shape=None):
     vc = cv2.VideoCapture(str(path))
     success, frame = vc.read()
     if success and shape is not None:
-        frame = tf.image.resize(frame, shape[::-1]).numpy()
+        # frame = tf.image.resize(frame, shape[::-1]).numpy()
+        frame = cv2.resize(frame, shape)
     batch = []
     while success:
         batch.append(frame)
@@ -44,7 +45,8 @@ def video_reader(path, batch_size=1, shape=None):
             batch = []
         success, frame = vc.read()
         if success and shape is not None:
-            frame = tf.image.resize(frame, shape[::-1]).numpy()
+            # frame = tf.image.resize(frame, shape[::-1]).numpy()
+            frame = cv2.resize(frame, shape)
     if len(batch) > 0:
         batch = np.array(batch)
         if batch_size == 1:
