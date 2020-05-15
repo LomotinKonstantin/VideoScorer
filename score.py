@@ -11,8 +11,6 @@ def get_args():
     arg_parser.add_argument("--path", required=True, action="store")
     arg_parser.add_argument("--gpu_mem", required=True, action="store", type=int)
     arg_parser.add_argument("--out_dir", required=True, action="store")
-    # arg_parser.add_argument("--sbd_threshold", required=False,
-    #                         type=float, action="store", default=0.5)
     return arg_parser.parse_args()
 
 
@@ -52,17 +50,17 @@ def main():
                           iqa_detector_wrapper=iqa_detector,
                           iqa_patch_weights=patch_weights,
                           is_tid=is_tid,
-                          face_cascade=face_cascade)
+                          face_cascade=face_cascade,
+                          out_path=out_path,
+                          gpu_mem=gpu_mem)
     logging.info(f"Assessment done. Time elapsed: {timedelta(seconds=result['total_time'])}")
     logging.info(f"Frames processed: {result['n_frames']}")
     logging.info(f"Total IQA time: {timedelta(seconds=result['iqa_time'])}")
-    # logging.info(f"Total SBD time: {timedelta(seconds=result['sbd_time'])}")
-    logging.info(f"Total STC time: {timedelta(seconds=result['stc_time'])}")
     logging.info(f"Total detector time: {timedelta(seconds=result['detector_time'])}")
-    logging.info(f"Mean processing performance: {timedelta(seconds=result['mean_fps'])} FPS")
+    logging.info(f"Mean processing performance: {result['mean_fps']:0.2f} FPS")
     scores = np.hstack(result["frame_scores_per_shots"])
     mean_score = np.mean(scores)
-    logging.info(f"Mean score: {mean_score}")
+    logging.info(f"Mean score: {mean_score}:0.3f")
     logging.info("Saving scores")
     with open(out_path / "result_dict.pkl", "wb") as sf:
         pickle.dump(result, sf)

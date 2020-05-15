@@ -3,6 +3,7 @@ from datetime import timedelta
 import logging
 from pathlib import Path
 import pickle
+from subprocess import Popen
 from time import time
 
 import cv2
@@ -87,23 +88,7 @@ def iqa_assess_frames(iqa_model, iqa_detector: TFLiteModel,
     return iqa_scores, time() - t
 
 
-
-
-
-def predict_stc_probas(frames: np.ndarray):
-    """
-
-    :param frames: uint8, [0, 255], [b, w, h, c]
-    :return:
-    """
-    predict = np.vectorize(_create_shot_type_predictor(STC_SHAPE),
-                           signature="(n,m,l)->(k)")
-    probas = predict(frames)
-    return probas
-
-
 def _create_face_finder(face_cascade: cv2.CascadeClassifier):
-
     def find_faces(frame: np.ndarray):
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
@@ -158,6 +143,18 @@ def aggregate_scores_for_shot(iqa_scores: np.ndarray,
     return frame_scores
 
 
+def aggregate_scores_for_video(iqa_scores_per_shots: list,
+                               stc_matrices: list,
+                               all_faces: list) -> list:
+    res = list(
+        map(
+            lambda args: aggregate_scores_for_shot(*args),
+            zip(iqa_scores_per_shots, stc_matrices, all_faces)
+        )
+    )
+    return res
+
+
 def _most_common(flat_list):
     return Counter(flat_list).most_common()[0][0]
 
@@ -177,6 +174,16 @@ def get_start_end_shot_types(stc_matrix: np.ndarray, area: 0.3) -> tuple:
     start_st = _most_common(start_decoded)
     end_st = _most_common(end_decoded)
     return start_st, end_st
+
+
+def get_start_end_shot_types_from_all(stc_matrices: list, area: 0.3) -> list:
+    res = list(
+        map(
+            lambda sm: get_start_end_shot_types(sm, area),
+            stc_matrices
+        )
+    )
+    return res
 
 
 def count_good_transitions(shot_start_end_types: list) -> int:
@@ -221,14 +228,22 @@ def get_shot(reader, n_frames, shape):
     return res.astype(np.uint8)
 
 
+def start_stc_bg(vid_path: Path, out_path: Path, gpu_mem: int):
+    command = f"python run_stc.py {str(vid_path)} {str(out_path)} {gpu_mem}"
+    p = Popen(command)
+    return p
+
+
 def assess_video(vid_path: Path,
                  out_path: Path,
                  iqa_model,
                  iqa_detector_wrapper: TFLiteModel,
                  iqa_patch_weights: np.ndarray,
                  is_tid: bool,
+                 gpu_mem: int,
                  face_cascade: cv2.CascadeClassifier) -> dict:
     """
+    :param gpu_mem:
     :param out_path:
     :param face_cascade:
     :param is_tid:
@@ -240,18 +255,18 @@ def assess_video(vid_path: Path,
     """
     logger = logging.getLogger("assess_video")
     total_time = time()
-    logger.info("Loading video")
     logger.info("Loading shot boundaries")
     sb_fpath = out_path / "tmp"
     with open(str(sb_fpath), "rb") as sb_file:
         shots = pickle.load(sb_file)
+    logger.info("Starting STC process in background")
+    stc_process = start_stc_bg(vid_path=vid_path, out_path=out_path, gpu_mem=gpu_mem)
     pix_coef = 1 / 255
-    shot_start_end_types = []
-    video_scores = []
     total_iqa_time = 0
-    total_stc_time = 0
     total_detector_time = 0
     reader = video_reader(vid_path, shape=STC_SHAPE[::-1])
+    iqa_scores_per_shot = []
+    all_faces = []
     for idx, (start, end) in enumerate(shots):
         logger.info(f"Processing shot {idx + 1} / {len(shots)}")
         # Собираем шот
@@ -264,20 +279,12 @@ def assess_video(vid_path: Path,
         iqa_scores, iqa_time = iqa_assess_frames(frames=iqa_shot_arr, iqa_model=iqa_model,
                                                  iqa_detector=iqa_detector_wrapper,
                                                  patch_weights=iqa_patch_weights)
-        total_iqa_time += iqa_time
-        logger.info(f"\tDone ({timedelta(seconds=iqa_time)})")
         # Если модель TID*, переводим MOS в шкалу [0, 100]
         if is_tid:
             iqa_scores *= TID_TO_LIVE_MOS_COEF
-
-        # STC
-        logger.info("\tPredicting shot types")
-        t = time()
-        stc_probas = predict_stc_probas(frames=shot_uint8)
-        stc_time = time() - t
-        total_stc_time += stc_time
-        logger.info(f"\tDone ({timedelta(seconds=stc_time)})")
-
+        iqa_scores_per_shot.append(iqa_scores)
+        total_iqa_time += iqa_time
+        logger.info(f"\tDone ({timedelta(seconds=iqa_time)})")
         # Faces
         logger.info("\tDetecting faces")
         t = time()
@@ -285,15 +292,26 @@ def assess_video(vid_path: Path,
         detector_time = time() - t
         total_detector_time += detector_time
         logger.info(f"\tDone ({timedelta(seconds=detector_time)})")
+        all_faces.append(shot_faces)
 
-        # Собираем оценки
-        logger.info("\tAggregating scores")
-        shot_scores = aggregate_scores_for_shot(iqa_scores=iqa_scores,
-                                                stc_matrix=stc_probas,
-                                                face_boxes=shot_faces)
-        video_scores.append(shot_scores)
-        shot_types = get_start_end_shot_types(stc_probas, area=0.3)
-        shot_start_end_types.append(shot_types)
+    # Ждем конца работы STC
+    stc_process.wait()
+    logger.info("STC finished")
+    # Удаляем временный файл SBD
+    if sb_fpath.exists():
+        sb_fpath.unlink()
+    # Грузим результат
+    stc_res_path = Path(out_path / "shot_types")
+    with open(stc_res_path, "rb") as stc_res_file:
+        stc_probas = pickle.load(stc_res_file)
+    if stc_res_path.exists():
+        stc_res_path.unlink()
+    # Собираем оценки
+    logger.info("Aggregating scores")
+    video_scores = aggregate_scores_for_video(iqa_scores_per_shots=iqa_scores_per_shot,
+                                              stc_matrices=stc_probas,
+                                              all_faces=all_faces)
+    shot_start_end_types = get_start_end_shot_types_from_all(stc_probas, area=0.3)
 
     # Теперь надо оценить переходы
     logger.info("Assessing transitions")
@@ -313,8 +331,6 @@ def assess_video(vid_path: Path,
         "n_good_transitions": n_good_transition,
         "gt_percent": gt_percent,
         "iqa_time": total_iqa_time,
-        # "sbd_time": total_sbd_time,
-        "stc_time": total_stc_time,
         "detector_time": total_detector_time,
         "total_time": total_time,
         "mean_fps": n_frames / total_time,
