@@ -16,7 +16,7 @@ def get_args():
     return arg_parser.parse_args()
 
 
-def run_sbd(vid_path: Path, sbd_threshold: int, gpu_mem: int):
+def run_sbd(vid_path: Path, sbd_threshold: int, gpu_mem: int, out_dir: Path):
     sb_fpath = Path("tmp")
     # Удаляем результаты прошлого запуска
     if sb_fpath.exists():
@@ -24,6 +24,7 @@ def run_sbd(vid_path: Path, sbd_threshold: int, gpu_mem: int):
     try:
         subprocess.run(["python", "detect_shots.py",
                         str(vid_path),
+                        str(out_dir),
                         str(sbd_threshold),
                         str(gpu_mem)], check=True)
     except subprocess.CalledProcessError as e:
@@ -57,7 +58,8 @@ def main():
     logger = logging.getLogger("Launcher")
     #
     t = time()
-    run_sbd(vid_path=vid_path, sbd_threshold=sbd_threshold, gpu_mem=gpu_mem)
+    run_sbd(vid_path=vid_path, sbd_threshold=sbd_threshold,
+            gpu_mem=gpu_mem, out_dir=out_path)
     sbd_time = time() - t
     logger.info(f"SBD script has taken {timedelta(seconds=sbd_time)}")
     for hdl in list(logger.handlers):

@@ -87,31 +87,7 @@ def iqa_assess_frames(iqa_model, iqa_detector: TFLiteModel,
     return iqa_scores, time() - t
 
 
-def _create_shot_type_predictor(target_shape: tuple):
-    coef = 1 / 255
-    from fastai.basic_train import load_learner
-    from fastai.vision import Image, np2model_tensor
-    from fastai import torch_core
-    torch_core.defaults.device = 'cpu'
-    logging.info("Loading STC model")
-    cur_folder = Path(__file__).parent.absolute() / ".."
-    stc_predictor = load_learner(cur_folder / "stc", "shot-type-classifier.pkl")
 
-    def predict_shot_type(frame: np.ndarray):
-        pil_img = PIL_Image.fromarray(frame)
-        # Приводим к форме модели STC для лучшего результата
-        if frame.shape[:-1] != STC_SHAPE:
-            pil_img = pil_img.resize(target_shape)
-        # Нормируем
-        img_data = np.array(pil_img).astype(np.float32) * coef
-        # fastai.vision требует каналы первыми
-        img_data = np.moveaxis(img_data, -1, 0)
-        # Конвертируем np.ndarray -> pytorch.Tensor и заворачиваем в fastai.vision.Image
-        img_data = Image(np2model_tensor(img_data))
-        pred_arr = stc_predictor.predict(img_data)[2]
-        return pred_arr.numpy()
-
-    return predict_shot_type
 
 
 def predict_stc_probas(frames: np.ndarray):
@@ -246,12 +222,14 @@ def get_shot(reader, n_frames, shape):
 
 
 def assess_video(vid_path: Path,
+                 out_path: Path,
                  iqa_model,
                  iqa_detector_wrapper: TFLiteModel,
                  iqa_patch_weights: np.ndarray,
                  is_tid: bool,
                  face_cascade: cv2.CascadeClassifier) -> dict:
     """
+    :param out_path:
     :param face_cascade:
     :param is_tid:
     :param iqa_patch_weights: массив весов для патчей
@@ -264,8 +242,8 @@ def assess_video(vid_path: Path,
     total_time = time()
     logger.info("Loading video")
     logger.info("Loading shot boundaries")
-    sb_fpath = Path("tmp")
-    with open(sb_fpath, "rb") as sb_file:
+    sb_fpath = out_path / "tmp"
+    with open(str(sb_fpath), "rb") as sb_file:
         shots = pickle.load(sb_file)
     pix_coef = 1 / 255
     shot_start_end_types = []

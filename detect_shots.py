@@ -39,6 +39,7 @@ def read_to_array(video_path: Path, width: int or None, height: int or None):
 def get_args():
     arg_parser = ArgumentParser()
     arg_parser.add_argument("vid_path", action="store")
+    arg_parser.add_argument("out_dir", action="store")
     arg_parser.add_argument("sbd_threshold", action="store", type=float)
     arg_parser.add_argument("gpu_mem", action="store", type=int)
     return arg_parser.parse_args()
@@ -59,6 +60,7 @@ def main():
     else:
         tf.config.experimental.set_visible_devices([], 'GPU')
     vid_path = args.vid_path
+    out_dir = Path(args.out_dir)
     sbd_threshold = args.sbd_threshold
     params = TransNetParams()
     cur_folder = Path(__file__).parent.absolute()
@@ -69,7 +71,7 @@ def main():
                                         width=net.params.INPUT_WIDTH,
                                         height=net.params.INPUT_HEIGHT)
     sb = get_shot_boundaries(net=net, video=video_arr_255_uint8, threshold=sbd_threshold)
-    with open("tmp", "wb") as sb_file:
+    with open(out_dir / "tmp", "wb") as sb_file:
         pickle.dump(sb, sb_file)
 
 
