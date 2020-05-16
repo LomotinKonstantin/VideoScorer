@@ -60,7 +60,7 @@ def main():
     logging.info(f"Mean processing performance: {result['mean_fps']:0.2f} FPS")
     scores = np.hstack(result["frame_scores_per_shots"])
     mean_score = np.mean(scores)
-    logging.info(f"Mean score: {mean_score}:0.3f")
+    logging.info(f"Mean score: {mean_score:0.3f}")
     logging.info("Saving scores")
     with open(out_path / "result_dict.pkl", "wb") as sf:
         pickle.dump(result, sf)

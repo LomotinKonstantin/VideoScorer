@@ -219,13 +219,16 @@ def reshape_video(video: np.ndarray, new_w: int, new_h: int) -> np.ndarray:
     return reshaper(video)
 
 
-def get_shot(reader, n_frames, shape):
-    res = np.empty((n_frames, *shape))
-    for idx, frame in enumerate(reader):
-        res[idx, ...] = frame
-        if idx == n_frames - 1:
-            break
-    return res.astype(np.uint8)
+def get_shot_gen(reader, n_frames, shape, max_size: int):
+    while n_frames > 0:
+        real_size = min(n_frames, max_size)
+        res = np.empty((real_size, *shape))
+        for idx, frame in enumerate(reader):
+            res[idx, ...] = frame
+            if idx == n_frames - 1:
+                break
+        yield res.astype(np.uint8)
+        n_frames -= real_size
 
 
 def start_stc_bg(vid_path: Path, out_path: Path, gpu_mem: int):
@@ -267,31 +270,42 @@ def assess_video(vid_path: Path,
     reader = video_reader(vid_path, shape=STC_SHAPE[::-1])
     iqa_scores_per_shot = []
     all_faces = []
+    detector_time = 0
     for idx, (start, end) in enumerate(shots):
         logger.info(f"Processing shot {idx + 1} / {len(shots)}")
         # Собираем шот
-        shot_uint8 = get_shot(reader, n_frames=end - start, shape=(*STC_SHAPE, 3))
-        # IQA
-        # Для IQA каждый шот надо привести к интервалу [0, 1]
-        # Для скорости не делим на 255, а умножаем на 1/255
-        logger.info("\tPredicting IQA")
-        iqa_shot_arr = shot_uint8.astype(np.float32) * pix_coef
-        iqa_scores, iqa_time = iqa_assess_frames(frames=iqa_shot_arr, iqa_model=iqa_model,
-                                                 iqa_detector=iqa_detector_wrapper,
-                                                 patch_weights=iqa_patch_weights)
+        # TODO: хардкод max_size
+        shot_gen = get_shot_gen(reader, n_frames=end - start, shape=(*STC_SHAPE, 3), max_size=500)
+        iqa_time = 0
+        iqa_scores = []
+        shot_faces = []
+        for shot_uint8 in shot_gen:
+            # IQA
+            # Для IQA каждый шот надо привести к интервалу [0, 1]
+            # Для скорости не делим на 255, а умножаем на 1/255
+            iqa_shot_arr = shot_uint8.astype(np.float32) * pix_coef
+            iqa_scores_batch, iqa_time_batch = iqa_assess_frames(frames=iqa_shot_arr, iqa_model=iqa_model,
+                                                                 iqa_detector=iqa_detector_wrapper,
+                                                                 patch_weights=iqa_patch_weights)
+            iqa_scores.append(iqa_scores_batch)
+            iqa_time += iqa_time_batch
+            # Faces
+            t = time()
+            shot_faces_batch = faces_bboxes(frames=shot_uint8, face_cascade=face_cascade)
+            detector_time += time() - t
+            shot_faces.extend(shot_faces_batch)
+
+        # Собираем батчи обратно
+        iqa_scores = np.hstack(iqa_scores)
         # Если модель TID*, переводим MOS в шкалу [0, 100]
         if is_tid:
             iqa_scores *= TID_TO_LIVE_MOS_COEF
         iqa_scores_per_shot.append(iqa_scores)
         total_iqa_time += iqa_time
-        logger.info(f"\tDone ({timedelta(seconds=iqa_time)})")
+        logger.info(f"\tPredicting IQA has taken {timedelta(seconds=iqa_time)}")
         # Faces
-        logger.info("\tDetecting faces")
-        t = time()
-        shot_faces = faces_bboxes(frames=shot_uint8, face_cascade=face_cascade)
-        detector_time = time() - t
         total_detector_time += detector_time
-        logger.info(f"\tDone ({timedelta(seconds=detector_time)})")
+        logger.info(f"\tDetecting faces has taken {timedelta(seconds=detector_time)}")
         all_faces.append(shot_faces)
 
     # Ждем конца работы STC
@@ -318,10 +332,10 @@ def assess_video(vid_path: Path,
     n_good_transition = count_good_transitions(shot_start_end_types)
     # Доля хороших переходов
     n_transitions = len(shot_start_end_types) - 1
-    if n_transitions > 0:
+    if n_transitions > 1:
         gt_percent = n_good_transition / n_transitions
     else:
-        gt_percent = 1
+        gt_percent = 0
     total_time = time() - total_time
     logger.info(f"Good transitions: {n_good_transition} ({gt_percent * 100:.2f}%)")
     n_frames = len(np.hstack(video_scores))
