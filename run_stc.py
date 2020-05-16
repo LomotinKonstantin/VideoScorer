@@ -13,13 +13,16 @@ STC_SHAPE = (375, 666)
 SHOT_TYPES = ("CU", "ECU", "EWS", "LS", "MS", "MCU")
 
 
-def get_shot(reader, n_frames, shape):
-    res = np.empty((n_frames, *shape))
-    for idx, frame in enumerate(reader):
-        res[idx, ...] = frame
-        if idx == n_frames - 1:
-            break
-    return res.astype(np.uint8)
+def get_shot_gen(reader, n_frames, shape, max_size: int):
+    while n_frames > 0:
+        real_size = min(n_frames, max_size)
+        res = np.empty((real_size, *shape))
+        for idx, frame in enumerate(reader):
+            res[idx, ...] = frame
+            if idx == n_frames - 1:
+                break
+        yield res.astype(np.uint8)
+        n_frames -= real_size
 
 
 def video_reader(path, batch_size=1, shape=None):
@@ -85,8 +88,13 @@ def get_st(shots, vid_path, stc_predictor):
     reader = video_reader(vid_path, shape=STC_SHAPE[::-1])
     all_stc_probas = []
     for idx, (start, end) in enumerate(shots):
-        shot_uint8 = get_shot(reader, n_frames=end - start, shape=(*STC_SHAPE, 3))
-        stc_probas = predict_stc_probas(frames=shot_uint8, stc_predictor=stc_predictor)
+        shot_gen = get_shot_gen(reader, n_frames=end - start, shape=(*STC_SHAPE, 3), max_size=500)
+        stc_probas = []
+        for shot_uint8 in shot_gen:
+            stc_probas_batch = predict_stc_probas(frames=shot_uint8, stc_predictor=stc_predictor)
+            stc_probas.append(stc_probas_batch)
+        stc_probas = np.concatenate(stc_probas, axis=0)
+        assert len(stc_probas) == end - start, f"{stc_probas.shape}[0] != {start} - {end}"
         all_stc_probas.append(stc_probas)
     return all_stc_probas
 
