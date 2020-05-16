@@ -19,7 +19,7 @@ def get_shot_gen(reader, n_frames, shape, max_size: int):
         res = np.empty((real_size, *shape))
         for idx, frame in enumerate(reader):
             res[idx, ...] = frame
-            if idx == n_frames - 1:
+            if idx == real_size - 1:
                 break
         yield res.astype(np.uint8)
         n_frames -= real_size
