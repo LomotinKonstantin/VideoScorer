@@ -49,6 +49,7 @@ def main():
     args = get_args()
     vid_path = Path(args.path)
     out_path = Path(args.out_dir)
+    out_path.mkdir(exist_ok=True)
     gpu_mem = args.gpu_mem
     sbd_threshold = args.sbd_threshold
     #
