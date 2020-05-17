@@ -16,6 +16,17 @@ def get_shot_boundaries(net: TransNet, video: np.ndarray, threshold: float):
     predicts = net.predict_video(video)
     # Порог 0.5 - оптимально
     scenes = scenes_from_predictions(predicts, threshold)
+    # Чиним границы, чтобы не пропадали кадры
+    # Подтягиваем предыдущий кадр к следующему
+    next_idx = 1
+    cur_idx = 0
+    while next_idx < len(scenes):
+        last_cur_frame = scenes[cur_idx][-1]
+        first_next_frame = scenes[next_idx][0]
+        if last_cur_frame != first_next_frame:
+            scenes[next_idx][0] = last_cur_frame
+        cur_idx = next_idx
+        next_idx += 1
     return scenes
 
 
