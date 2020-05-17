@@ -21,6 +21,8 @@ LIVE_MAX_MOS = 100.
 TID_TO_LIVE_MOS_COEF = LIVE_MAX_MOS / TID_MAX_MOS
 SHOT_TYPES = ("CU", "ECU", "EWS", "LS", "MS", "MCU")
 STC_SHAPE = (375, 666)
+TRANS_ASSESS_AREA = 0.3
+GOOD_TRANS_UP_COEF = 1.2
 
 GOOD_TRANSITIONS = (
     {"ECU", "MCU"}, {"CU", "MS"},
@@ -130,28 +132,43 @@ def aggregate_scores_for_shot(iqa_scores: np.ndarray,
     # в порядке ("CU", "ECU", "EWS", "LS", "MS", "MCU")
     # Оценка ближайшего плана должна быть занижена (=== завышенные требования)
     st_weights = np.array(
-        [0.6, 0.6, 0., 0., 0.1, 0.5]
+        [0.8, 0.8, 1., 1., 0.9, 0.8]
     )
     # Сначала считаем итоговые веса планов как скалярное произведение
     # весов на вероятности.
     # Потом умножаем получившийся коэффициент на оценку IQA
+    # IQA лежит в [0, 100], сумма вероятностей равна 1.
+    # Взвешенные вероятности лежат в [0, 1].
+    # Взвешенное IQA лежит в [0, 10].
     weighted_iqa = np.multiply(stc_matrix.dot(st_weights), iqa_scores)
     # Количество лиц на каждом кадре
     n_faces_for_frames = np.array(list(map(len, face_boxes)))
-    # Пока непонятно, что делать с этой информацией
-    frame_scores = weighted_iqa + n_faces_for_frames * 0.5
+    # Пока непонятно, что делать с информацией о лицах,
+    # поэтому просто прибавляем их количество
+    frame_scores = weighted_iqa + n_faces_for_frames
     return frame_scores
 
 
 def aggregate_scores_for_video(iqa_scores_per_shots: list,
                                stc_matrices: list,
-                               all_faces: list) -> list:
+                               all_faces: list,
+                               good_transitions: list) -> list:
     res = list(
         map(
             lambda args: aggregate_scores_for_shot(*args),
             zip(iqa_scores_per_shots, stc_matrices, all_faces)
         )
-    )
+    )  # list[np.ndarray]
+    # Хорошие переходы умножаем на повышающий коэффициент
+    # Под переходом понимается (TRANS_ASSESS_AREA)% кадров слева и справа от перехода
+    for from_idx, to_idx in good_transitions:
+        n_frames_from = len(res[from_idx])
+        if n_frames_from > 1:
+            res[from_idx][int(n_frames_from * TRANS_ASSESS_AREA):] *= GOOD_TRANS_UP_COEF
+        #
+        n_frames_to = len(res[to_idx])
+        if n_frames_to > 1:
+            res[to_idx][:int(n_frames_to * TRANS_ASSESS_AREA)] *= GOOD_TRANS_UP_COEF
     return res
 
 
@@ -186,7 +203,7 @@ def get_start_end_shot_types_from_all(stc_matrices: list, area: 0.3) -> list:
     return res
 
 
-def count_good_transitions(shot_start_end_types: list) -> int:
+def get_good_transitions(shot_start_end_types: list) -> list:
     """
     'Многолетним опытом было установлено,
     что наиболее гладко воспринимается стык между планами,
@@ -197,15 +214,15 @@ def count_good_transitions(shot_start_end_types: list) -> int:
     :return:
     """
     idx = 1
-    n_good_transitions = 0
+    good_transitions = []
     while idx < len(shot_start_end_types):
         cur_pair = shot_start_end_types[idx - 1]
         next_pair = shot_start_end_types[idx]
         transition = {cur_pair[1], next_pair[0]}
         if transition in GOOD_TRANSITIONS:
-            n_good_transitions += 1
+            good_transitions.append((idx - 1, idx))
         idx += 1
-    return n_good_transitions
+    return good_transitions
 
 
 def reshape_video(video: np.ndarray, new_w: int, new_h: int) -> np.ndarray:
@@ -320,29 +337,32 @@ def assess_video(vid_path: Path,
         stc_probas = pickle.load(stc_res_file)
     if stc_res_path.exists():
         stc_res_path.unlink()
+    # Теперь надо оценить переходы
+    logger.info("Assessing transitions")
+    shot_start_end_types = get_start_end_shot_types_from_all(stc_probas,
+                                                             area=TRANS_ASSESS_AREA)
+    good_transitions = get_good_transitions(shot_start_end_types)
+    n_good_transitions = len(good_transitions)
     # Собираем оценки
     logger.info("Aggregating scores")
     video_scores = aggregate_scores_for_video(iqa_scores_per_shots=iqa_scores_per_shot,
                                               stc_matrices=stc_probas,
-                                              all_faces=all_faces)
-    shot_start_end_types = get_start_end_shot_types_from_all(stc_probas, area=0.3)
-
-    # Теперь надо оценить переходы
-    logger.info("Assessing transitions")
-    n_good_transition = count_good_transitions(shot_start_end_types)
+                                              all_faces=all_faces,
+                                              good_transitions=good_transitions)
     # Доля хороших переходов
     n_transitions = len(shot_start_end_types) - 1
     if n_transitions > 1:
-        gt_percent = n_good_transition / n_transitions
+        gt_percent = n_good_transitions / n_transitions
     else:
         gt_percent = 0
     total_time = time() - total_time
-    logger.info(f"Good transitions: {n_good_transition} ({gt_percent * 100:.2f}%)")
+    logger.info(f"Good transitions: {n_good_transitions} ({gt_percent * 100:.2f}%)")
     n_frames = len(np.hstack(video_scores))
     result = {
         "frame_scores_per_shots": video_scores,
         "n_shots": len(shots),
-        "n_good_transitions": n_good_transition,
+        "n_good_transitions": n_good_transitions,
+        "good_transitions": good_transitions,
         "gt_percent": gt_percent,
         "iqa_time": total_iqa_time,
         "detector_time": total_detector_time,
