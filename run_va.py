@@ -45,6 +45,25 @@ def run_scoring(vid_path: Path, out_path: Path, gpu_mem: str):
         exit(1)
 
 
+def run(vid_path: Path, out_path: Path, gpu_mem: int, sbd_threshold=0.5):
+    logging.basicConfig(filename=out_path / "report.log",
+                        level=logging.INFO, filemode="w",
+                        format="[%(asctime)s]\t%(message)s")
+    logger = logging.getLogger("Launcher")
+    #
+    t = time()
+    run_sbd(vid_path=vid_path, sbd_threshold=sbd_threshold,
+            gpu_mem=gpu_mem, out_dir=out_path)
+    sbd_time = time() - t
+    logger.info(f"SBD script has taken {timedelta(seconds=sbd_time)}")
+    for hdl in list(logger.handlers):
+        logger.removeHandler(hdl)
+        hdl.flush()
+        hdl.close()
+    #
+    run_scoring(vid_path=vid_path, out_path=out_path, gpu_mem=gpu_mem)
+        
+        
 def main():
     args = get_args()
     vid_path = Path(args.path)
