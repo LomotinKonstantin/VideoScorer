@@ -19,12 +19,12 @@ SBD_THRESHOLD = 0.5
 # Так в исходном матлабовском скрипте оценки
 SUMMARY_PERCENT = 0.15
 
-### Относительные пути. Зависят от того, как распакованы внутренние архивы
+# Относительные пути. Зависят от того, как распакованы внутренние архивы
 TS_DATA_FOLDER = TS_ROOT / "ydata-tvsum50-data/data/"
 TS_INFO_PATH = TS_DATA_FOLDER / "ydata-tvsum50-info.tsv"
 TS_ANNO_PATH = TS_DATA_FOLDER / "ydata-tvsum50-anno.tsv"
 TS_VIDEO_FOLDER = TS_ROOT / "ydata-tvsum50-video/video/"
-###
+#
 
 
 def get_averaged_scores(anno_path: Path) -> dict:

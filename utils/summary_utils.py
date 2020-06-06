@@ -10,8 +10,8 @@ from utils.gpu_safe import video_reader
 
 def load_shot_scores(report_path: Path) -> list:
     assert report_path.exists()
-    # Прекрасно работает и без str, но инспекции PyCharm раздражают
-    with open(str(report_path), "rb") as rep_file:
+    # Инспекции PyCharm иногда ошибочно ругаются
+    with open(report_path, "rb") as rep_file:
         report = pickle.load(rep_file)
     return report["frame_scores_per_shots"]
 
@@ -63,6 +63,7 @@ def smooth(x, window_len=200, window='filtfilt', order=2):
         the smoothed signal"""
 
     if window == "filtfilt":
+        # Тут тоже все ок
         b, a = butter(order, 0.01)
 
         # Apply the filter to xn.  Use lfilter_zi to choose the initial condition
@@ -95,7 +96,7 @@ def filter_video_by_scores(vid_path, out_dir, flat_scores, required_time):
     #
     flat_scores = smooth(flat_scores, window_len=200, window="filtfilt")
     #
-    fps = cv2.VideoCapture(str(vid_path)).get(cv2.CAP_PROP_FPS)
+    fps = cv2.VideoCapture(vid_path).get(cv2.CAP_PROP_FPS)
     reader = video_reader(vid_path)
     frame = next(reader)
     out_stream = cv2.VideoWriter(filename=str(out_path), apiPreference=cv2.CAP_FFMPEG,

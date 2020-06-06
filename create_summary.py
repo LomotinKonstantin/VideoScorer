@@ -15,10 +15,10 @@ def parse_args() -> dict:
     # Длина summary в секундах
     parser.add_argument("-t", action="store", type=int, help="Длина summary в секундах")
     # [Optional] Количество видеопамяти в Мб, которое попытаются занять фреймворки
-    parser.add_argument("--gpu_mem", action="store", type=int, default=-1,
+    parser.add_argument("--gpu_mem", action="store", required=False, type=int, default=-1,
                         help="Количество видеопамяти в Мб, которое попытаются занять фреймворки")
     # [Optional] Порог вероятности для переходов
-    parser.add_argument("--sbd_threshold", action="store", type=float, default=0.5,
+    parser.add_argument("--sbd_threshold", action="store", required=False, type=float, default=0.5,
                         help="Порог вероятности для переходов")
     return vars(parser.parse_args())
 

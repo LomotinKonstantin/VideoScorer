@@ -16,7 +16,7 @@ def get_args():
     return arg_parser.parse_args()
 
 
-def run_sbd(vid_path: Path, sbd_threshold: int, gpu_mem: int, out_dir: Path):
+def run_sbd(vid_path: Path, sbd_threshold: float, gpu_mem: int, out_dir: Path):
     sb_fpath = Path("tmp")
     # Удаляем результаты прошлого запуска
     if sb_fpath.exists():
@@ -32,7 +32,7 @@ def run_sbd(vid_path: Path, sbd_threshold: int, gpu_mem: int, out_dir: Path):
         exit(1)
 
 
-def run_scoring(vid_path: Path, out_path: Path, gpu_mem: str):
+def run_scoring(vid_path: Path, out_path: Path, gpu_mem: int):
     args = [f"--path {str(vid_path)}",
             f"--gpu_mem {str(gpu_mem)}",
             f"--out_dir {str(out_path)}"]
@@ -76,17 +76,18 @@ def main():
                         level=logging.INFO, filemode="w",
                         format="[%(asctime)s]\t%(message)s")
     logger = logging.getLogger("Launcher")
-    #
+    # Запускаем разбиение на шоты
     t = time()
     run_sbd(vid_path=vid_path, sbd_threshold=sbd_threshold,
             gpu_mem=gpu_mem, out_dir=out_path)
     sbd_time = time() - t
     logger.info(f"SBD script has taken {timedelta(seconds=sbd_time)}")
+    # Закрываем все логгеры, чтобы в тот же файл писать из другого процесса
     for hdl in list(logger.handlers):
         logger.removeHandler(hdl)
         hdl.flush()
         hdl.close()
-    #
+    # Запускаем процесс оценки (который может спавнить другие процессы)
     run_scoring(vid_path=vid_path, out_path=out_path, gpu_mem=gpu_mem)
 
 

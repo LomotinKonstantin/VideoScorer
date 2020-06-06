@@ -69,8 +69,8 @@ def iqa_assess_frames(iqa_model, iqa_detector: TFLiteModel,
     :param iqa_detector:
     :param patch_weights:
     :param frames: фреймы подходящего для iqa_model размера
-                    float, [0, 1], [b, w, h, c]
-    :return:
+                    type: float, values in [0, 1], format [batch, width, height, channels]
+    :return: tuple(scores: np.ndarray, time: float)
     """
     assert len(frames), "'frames' must contain at least one image (3d-array)"
     n_patches = int(np.sqrt(len(patch_weights)))
@@ -82,7 +82,7 @@ def iqa_assess_frames(iqa_model, iqa_detector: TFLiteModel,
                                                      patch_size=patch_size,
                                                      patches_per_side=n_patches),
                                    signature="(n,m,k)->()")
-    # На этом моменте молимся
+    # На этом моменте молимся, ибо боттлнек (+ нестабильность TF GPU)
     t = time()
     assert len(frames.shape) == 4, frames.shape
     iqa_scores = preprocess_func(frames)
@@ -153,13 +153,21 @@ def aggregate_scores_for_video(iqa_scores_per_shots: list,
                                stc_matrices: list,
                                all_faces: list,
                                good_transitions: list) -> list:
+    """
+    Собрать оценки в одну. Сейчас используется просто линейная комбинация
+    :param iqa_scores_per_shots: список массивов шотов, в каждом - покадровые оценки качества
+    :param stc_matrices: матрица 6xN_frames, вероятности 6 типов планов для каждого кадра
+    :param all_faces: список
+    :param good_transitions:
+    :return:
+    """
     res = list(
         map(
             lambda args: aggregate_scores_for_shot(*args),
             zip(iqa_scores_per_shots, stc_matrices, all_faces)
         )
-    )  # list[np.ndarray]
-    # Хорошие переходы умножаем на повышающий коэффициент
+    )  # list[np.ndarray] - список массивов
+    # Хорошие переходы умножаем на повышающий коэффициент GOOD_TRANS_UP_COEF
     # Под переходом понимается (TRANS_ASSESS_AREA)% кадров слева и справа от перехода
     for from_idx, to_idx in good_transitions:
         n_frames_from = len(res[from_idx])
@@ -176,12 +184,12 @@ def _most_common(flat_list):
     return Counter(flat_list).most_common()[0][0]
 
 
-def get_start_end_shot_types(stc_matrix: np.ndarray, area: 0.3) -> tuple:
+def get_start_end_shot_types(stc_matrix: np.ndarray, area: float) -> tuple:
     """
     Извлечь начальный и конечный типы плана из шота.
     :param stc_matrix:
-    :param area:
-    :return:
+    :param area: область вокруг перехода, float. Совпадает с TRANS_ASSESS_AREA
+    :return: tuple(most_common_st_at_start, most_common_st_at_end)
     """
     n_frames = len(stc_matrix)
     start_area = int(n_frames * area) + 1
@@ -193,7 +201,7 @@ def get_start_end_shot_types(stc_matrix: np.ndarray, area: 0.3) -> tuple:
     return start_st, end_st
 
 
-def get_start_end_shot_types_from_all(stc_matrices: list, area: 0.3) -> list:
+def get_start_end_shot_types_from_all(stc_matrices: list, area: float) -> list:
     res = list(
         map(
             lambda sm: get_start_end_shot_types(sm, area),
@@ -263,24 +271,28 @@ def assess_video(vid_path: Path,
                  gpu_mem: int,
                  face_cascade: cv2.CascadeClassifier) -> dict:
     """
-    :param gpu_mem:
-    :param out_path:
-    :param face_cascade:
-    :param is_tid:
+    :param gpu_mem: количество выделенной видеопамяти (в Мб)
+    :param out_path: путь к рабочей папке (где будет раположен результат)
+    :param face_cascade: объект каскадного классификатора
+    :param is_tid: обучена ли модель IQA на датасете TID (для конвертации шкалы)
     :param iqa_patch_weights: массив весов для патчей
-    :param iqa_detector_wrapper: объект TFLiteModel
-    :param vid_path: путь к видеофайлу
+    :param iqa_detector_wrapper: объект TFLiteModel для обнаржения объектов (для IQA)
+    :param vid_path: путь к исходному видеофайлу
     :param iqa_model: подразумевается, что используется модель с детектором и патчами
-    :return:
+    :return: словарь с отчетом
     """
     logger = logging.getLogger("assess_video")
     total_time = time()
     logger.info("Loading shot boundaries")
+    # Считаем, что Shot Boundary Detection уже отработал
+    # Иначе будет File Not Found
     sb_fpath = out_path / "tmp"
     with open(str(sb_fpath), "rb") as sb_file:
         shots = pickle.load(sb_file)
+    #
     logger.info("Starting STC process in background")
     stc_process = start_stc_bg(vid_path=vid_path, out_path=out_path, gpu_mem=gpu_mem)
+    # Пока работает Shot Type Classifier, проводим IQA и Face Detection
     pix_coef = 1 / 255
     total_iqa_time = 0
     total_detector_time = 0
@@ -291,11 +303,12 @@ def assess_video(vid_path: Path,
     for idx, (start, end) in enumerate(shots):
         logger.info(f"Processing shot {idx + 1} / {len(shots)}")
         # Собираем шот
-        # TODO: хардкод max_size
+        # TODO: исправить хардкод размера батча max_size
         shot_gen = get_shot_gen(reader, n_frames=end - start, shape=(*STC_SHAPE, 3), max_size=500)
         iqa_time = 0
         iqa_scores = []
         shot_faces = []
+        # Почти все этапы реализованы как замыкания
         for shot_uint8 in shot_gen:
             # IQA
             # Для IQA каждый шот надо привести к интервалу [0, 1]
@@ -325,13 +338,13 @@ def assess_video(vid_path: Path,
         logger.info(f"\tDetecting faces has taken {timedelta(seconds=detector_time)}")
         all_faces.append(shot_faces)
 
-    # Ждем конца работы STC
+    # Ждем конца работы STC, если он еще не отработал
     stc_process.wait()
     logger.info("STC finished")
     # Удаляем временный файл SBD
     if sb_fpath.exists():
         sb_fpath.unlink()
-    # Грузим результат
+    # Считываем и удаляем результат
     stc_res_path = Path(out_path / "shot_types")
     with open(stc_res_path, "rb") as stc_res_file:
         stc_probas = pickle.load(stc_res_file)

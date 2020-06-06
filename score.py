@@ -1,6 +1,7 @@
 from argparse import ArgumentParser
 import json
 
+# Инспекции PyCharm не дружат с Tensorflow
 from tensorflow.keras.models import load_model
 
 from utils.va_utils import *
@@ -25,8 +26,10 @@ def main():
     cur_folder = Path(__file__).parent.absolute()
     with open("config.json") as cf:
         config = json.load(cf)
+    # Получаем FPS из файла
     fps = cv2.VideoCapture(str(vid_path)).get(cv2.CAP_PROP_FPS)
     logging.info(f"Video FPS: {fps}")
+    # Загрузка модулей
     # IQA
     logging.info("Loading IQA model")
     iqa_model_path = cur_folder / config["iqa_model"]
@@ -44,7 +47,7 @@ def main():
     logging.info("Loading face detector")
     cascade_path = str(cur_folder / "detector" / "haarcascade_frontalface_default.xml")
     face_cascade = cv2.CascadeClassifier(cascade_path)
-    #
+    # ВСЕ САМОЕ ИНТЕРЕСНОЕ ПРОИСХОДИТ ТУТ  <<<<
     logging.info("Starting assessment")
     result = assess_video(vid_path=vid_path, iqa_model=iqa_model,
                           iqa_detector_wrapper=iqa_detector,
@@ -53,6 +56,7 @@ def main():
                           face_cascade=face_cascade,
                           out_path=out_path,
                           gpu_mem=gpu_mem)
+    #
     logging.info(f"Assessment done. Time elapsed: {timedelta(seconds=result['total_time'])}")
     logging.info(f"Frames processed: {result['n_frames']}")
     logging.info(f"Total IQA time: {timedelta(seconds=result['iqa_time'])}")
