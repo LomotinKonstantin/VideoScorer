@@ -1,0 +1,22 @@
+{
+  "tampa_rave": {
+    "link": "https://www.youtube.com/watch?v=bDvzyYQ28Ic",
+    "quality": ["720p", "360p", "144p"]
+  },
+  "hiking_scotland": {
+    "link": "https://www.youtube.com/watch?v=DSqx8bzSEPs",
+    "quality": ["720p", "360p", "144p"]
+  },
+  "dubai_walk": {
+    "link": "https://www.youtube.com/watch?v=Xj0Sw61Mt0s",
+    "quality": ["720p", "360p", "144p"]
+  },
+  "birthday_party": {
+    "link": "https://www.youtube.com/watch?v=aVDvVmo40-g",
+    "quality": ["720p", "360p", "144p"]
+  },
+  "hanging_with_friends": {
+    "link": "https://www.youtube.com/watch?v=ms-PTl1TqKo",
+    "quality": ["720p", "360p", "144p"]
+  }
+}
