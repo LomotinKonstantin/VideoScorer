@@ -12,11 +12,15 @@ from utils.summary_utils import smooth, load_flat_scores
 
 
 # Настройки
-TS_ROOT = Path("D:/Desktop/Cursovaya/2020/data/video/tvsum50_ver_1_1/ydata-tvsum50-v1_1/")
+# Путь к корневому каталогу датасета
+TS_ROOT = Path("INSERT_YOUR_PATH_HERE")
+# Путь к папке, куда будет сохранен результат
 REPORT_FOLDER = Path("D:/Desktop/Cursovaya/2020/code/reports/va_debug/")
+# Количество видеопамяти для вычислений (Mb)
 GPU_MEM = 512
+# Порог вероятности для определения перехода
 SBD_THRESHOLD = 0.5
-# Так в исходном матлабовском скрипте оценки
+# Процент кадров, попадающих в summary. Выбор этого значения под вопросом
 SUMMARY_PERCENT = 0.15
 
 # Относительные пути. Зависят от того, как распакованы внутренние архивы
