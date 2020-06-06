@@ -1,73 +1,7 @@
 # VideoScorer
 Набор скриптов для комплексной оценки и суммаризации видео.
-![Scoring example](scoring_example.png)
-<details>
-  <summary> Содержимое репозитория </summary>
-```
-VideoScorer
-│   .gitignore
-│   config.json
-│   create_summary.py
-│   detect_shots.py
-│   download_youtube_videos.py
-│   env.yml
-│   run_stc.py
-│   run_va.py
-│   score.py
-│   tvsum_eval.py
-│   youtube_ds.json
-│
-├───detector
-│       haarcascade_frontalface_default.xml
-│
-├───iqa
-│   │   detect.tflite
-│   │
-│   └───detector_DIQA_64x9_more_epochs_27.04.2020_02-48-58
-│           detector_config.ini
-│           dist_diqa_oem_live.h5
-│           dist_diqa_oem_tid2008.h5
-│           dist_diqa_oem_tid2013.h5
-│           dist_diqa_ssm_live.csv
-│           dist_diqa_ssm_live.h5
-│           dist_diqa_ssm_tid2008.csv
-│           dist_diqa_ssm_tid2008.h5
-│           dist_diqa_ssm_tid2013.csv
-│           dist_diqa_ssm_tid2013.h5
-│           experiment.log
-│           metrics_live.txt
-│           metrics_tid2008.txt
-│           metrics_tid2013.txt
-│           oem_live.tflite
-│           oem_tid2008.tflite
-│           oem_tid2013.tflite
-│           ssm_live.tflite
-│           ssm_tid2008.tflite
-│           ssm_tid2013.tflite
-│           weights.pkl
-│
-├───stc
-│       shot-type-classifier.pkl
-│
-├───TransNet
-│   │   README.md
-│   │   transnet.py
-│   │   transnet_utils.py
-│   │
-│   ├───model
-│           transnet_model-F16_L3_S2_D256.data-00000-of-00001
-│           transnet_model-F16_L3_S2_D256.index
-│           transnet_model-F16_L3_S2_D256.
-│
-├───utils
-│       gpu_safe.py
-│       summary_utils.py
-│       TFLiteModel.py
-│       utils.py
-│       va_utils.py
-│       video_utils.py
-```
-</details>
+![](https://github.com/LomotinKonstantin/VideoScorer/img/scoring_example.png)
+
 ## Подготовка
 Перед началом раброты нужно установить все необходимые пакеты. Их список можно взять из файла ```env.yml```. Также (при наличии conda) можно создать из этого файла среду.
 ```bash
