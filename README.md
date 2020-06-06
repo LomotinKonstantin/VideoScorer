@@ -1,6 +1,7 @@
 # VideoScorer
 Набор скриптов для комплексной оценки и суммаризации видео.
-![](https://github.com/LomotinKonstantin/VideoScorer/img/scoring_example.png)
+
+![score_example](/img/scoring_example.png)
 
 ## Подготовка
 Перед началом раброты нужно установить все необходимые пакеты. Их список можно взять из файла ```env.yml```. Также (при наличии conda) можно создать из этого файла среду.
